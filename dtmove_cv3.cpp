@@ -16,7 +16,7 @@ int main( int argc, char** argv ){
     Mat element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
     bool occ = 0;
     int times = 0;
-    VideoCapture cap(1);
+    VideoCapture cap(-1);
 
     if(!cap.isOpened())  // check if we succeeded
         return -1;
