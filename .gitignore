@@ -26,3 +26,5 @@
 *.exe
 *.out
 *.app
+#pictures
+images/
