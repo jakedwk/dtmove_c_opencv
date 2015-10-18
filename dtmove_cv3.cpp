@@ -34,36 +34,34 @@ int main( int argc, char** argv ){
         waitKey(10);
     }
 
+    //初始化背景帧
     cap >> frame;
     cvtColor(frame, avg, COLOR_BGR2GRAY);
     GaussianBlur(avg, avg, Size(7,7), 1.5, 1.5);
-    for(;;)
+    gray = avg.clone();
+    frameold = gray.clone();
+    
+    for(;;)     //主循环
     {
-        frameold = gray.clone();
-        cap >> frame; // get a new frame from camera
-        cvtColor(frame, gray, COLOR_BGR2GRAY);
-        GaussianBlur(gray, gray, Size(7,7), 1.5, 1.5);
-        if ( (waitKey(10)&0xFF) == 103)
-        {
-            cap >> avg;
-            cvtColor(avg, avg, COLOR_BGR2GRAY);
-            GaussianBlur(avg, avg, Size(7,7), 1.5, 1.5);
-        }
-        absdiff(gray,avg,differ);
-        threshold(differ,thresh, 40, 255, THRESH_BINARY);
-        dilate(thresh,bigger, element,Point(-1,-1), 3);
-        findContours(bigger,contours, RETR_EXTERNAL,CHAIN_APPROX_SIMPLE);
+        cap >> frame;                                        // 获取一帧图像
+        cvtColor(frame, gray, COLOR_BGR2GRAY);               //转化为灰度图像
+        GaussianBlur(gray, gray, Size(7,7), 1.5, 1.5);       //高斯模糊
+        absdiff(gray,avg,differ);                            //比较两幅图片结果放入differ中
+        threshold(differ,thresh, 40, 255, THRESH_BINARY);    //根据给出的阈值二值化
+        dilate(thresh,bigger, element,Point(-1,-1), 3);      //膨胀图像
+        findContours(bigger,contours, RETR_EXTERNAL,CHAIN_APPROX_SIMPLE);  //寻找轮廓
         for(unsigned int j = 0; j < contours.size(); j++ )
         {
             if (contourArea(contours[j])<1000) continue;
             occ = 1;
             ret = boundingRect(contours[j]);
             rectangle(frame,ret,color,2);
-            if (times > 6)
+            if (times > 30)
             {
+                /*重新建立背景*/
                 times = 0;
                 absdiff(gray,frameold,frameold); 
-                mean = cv::mean(frameold);   
+                mean = cv::mean(frameold);   //名称空间重复故使用cv::
                 if  ( mean[0] < 2 ) 
                 {
                     //cout <<"frameold" << mean[0] << endl;
@@ -71,6 +69,7 @@ int main( int argc, char** argv ){
                     cvtColor(avg, avg, COLOR_BGR2GRAY);
                     GaussianBlur(avg, avg, Size(7,7), 1.5, 1.5);
                 }
+                frameold = gray.clone();
             }
             times++;
         }
