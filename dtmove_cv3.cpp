@@ -87,7 +87,7 @@ int main( int argc, char** argv ){
         imshow("bigger", bigger);
         now_time = time(NULL);
         //cout<<now_time<<endl;
-        p=gmtime(&now_time);
+        p=localtime(&now_time);
         strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
         //cout<<fmt_time<<endl;
         if((waitKey(20)&0xFF) == 115)
