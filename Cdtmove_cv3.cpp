@@ -9,20 +9,35 @@
 using namespace cv;
 using namespace std;
 
-int main( int argc, char** argv ){
+class Dtmove
+{
     Rect ret;
     time_t now_time;
     struct tm *p;
     char fmt_time[100];
+    bool occ;
+    int times;
     String svtime;
     vector<vector<Point> > contours;
-    Scalar color = Scalar( 0, 255, 0),mean;
+    Scalar color,mean;
     Mat gray,avg,differ,frame,frameold,bigger,thresh;
-    Mat element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
-    bool occ = 0;
-    int times = 0;
-    VideoCapture cap(-1);
+    Mat element ;
 
+public:
+    Dtmove();
+    int ckcamera(VideoCapture cap);
+    void start(VideoCapture cap);
+};
+
+Dtmove::Dtmove()
+{
+    occ = 0;
+    color = Scalar( 0, 255, 0);
+    element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
+
+}
+int Dtmove::ckcamera(VideoCapture cap)
+{
     if(!cap.isOpened())  // check if we succeeded
     {
         cout<<"设备打开错误";
@@ -33,6 +48,10 @@ int main( int argc, char** argv ){
         cap >> frame;
         waitKey(10);
     }
+    return 1;
+}
+void Dtmove::start(VideoCapture cap)
+{
 
     //初始化背景帧
     cap >> frame;
@@ -97,5 +116,10 @@ int main( int argc, char** argv ){
 
     cap.release();
     destroyAllWindows();
-    return 0;
+}
+int main( int argc, char** argv ){
+    VideoCapture cap(-1);
+    Dtmove dt;
+    dt.ckcamera(cap);
+    dt.start(cap);
 }

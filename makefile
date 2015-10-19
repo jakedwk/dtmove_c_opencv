@@ -7,6 +7,6 @@ r_dtmove_cv3.out : $(OBJS)
 	$(CXX) $(OBJS) $(CFLAGS) -o $@
 hello.o : dtmove_cv3.cpp
 clean :
-	rm *.out $(OBJS)
+	rm *.out *.o
 install :
 	sudo cp *.out /usr/local/bin
