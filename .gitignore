@@ -28,3 +28,4 @@
 *.app
 #pictures
 images/
+*.swp

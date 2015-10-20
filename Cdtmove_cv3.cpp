@@ -15,28 +15,32 @@ class Dtmove
     time_t now_time;
     struct tm *p;
     char fmt_time[100];
+    string path;
     bool occ;
     int times;
     String svtime;
+    VideoCapture cap;
     vector<vector<Point> > contours;
     Scalar color,mean;
     Mat gray,avg,differ,frame,frameold,bigger,thresh;
     Mat element ;
 
 public:
-    Dtmove();
-    int ckcamera(VideoCapture cap);
-    void start(VideoCapture cap);
+    Dtmove(int i,string pas);
+    int ckcamera();
+    void start();
 };
 
-Dtmove::Dtmove()
+Dtmove::Dtmove(int i ,string pas = "./image/")
 {
+    path =pas;
+    cap = VideoCapture(i);
     occ = 0;
     color = Scalar( 0, 255, 0);
     element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
 
 }
-int Dtmove::ckcamera(VideoCapture cap)
+int Dtmove::ckcamera()
 {
     if(!cap.isOpened())  // check if we succeeded
     {
@@ -50,7 +54,7 @@ int Dtmove::ckcamera(VideoCapture cap)
     }
     return 1;
 }
-void Dtmove::start(VideoCapture cap)
+void Dtmove::start()
 {
 
     //初始化背景帧
@@ -118,8 +122,7 @@ void Dtmove::start(VideoCapture cap)
     destroyAllWindows();
 }
 int main( int argc, char** argv ){
-    VideoCapture cap(-1);
-    Dtmove dt;
-    dt.ckcamera(cap);
-    dt.start(cap);
+    Dtmove dt(1);
+    dt.ckcamera();
+    dt.start();
 }
