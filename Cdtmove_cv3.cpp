@@ -17,6 +17,7 @@ class Dtmove
     char fmt_time[100];
     bool occ;
     int times;
+    char key;
     String svtime,path;
     VideoCapture cap;
     vector<vector<Point> > contours;
@@ -117,13 +118,15 @@ void Dtmove::start()
         now_time = time(NULL);
         p=localtime(&now_time);
         strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
-        if((waitKey(20)&0xFF) == 115)
+
+        key = waitKey(25)&0xFF;
+        if (key == 's')
         {
-            svtime = path + format("%s.jpg",fmt_time);
-            cout << svtime << endl;
-            imwrite(svtime,frame);
+        svtime = path + format("%s.jpg",fmt_time);
+        cout << svtime << endl;
+        imwrite(svtime,frame);
         }
-        if((waitKey(20)&0xFF) == 113) break;
+        if(key == 'q') break;
     }
 
     cap.release();
