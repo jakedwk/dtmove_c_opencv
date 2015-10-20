@@ -15,10 +15,9 @@ class Dtmove
     time_t now_time;
     struct tm *p;
     char fmt_time[100];
-    string path;
     bool occ;
     int times;
-    String svtime;
+    String svtime,path;
     VideoCapture cap;
     vector<vector<Point> > contours;
     Scalar color,mean;
@@ -26,14 +25,14 @@ class Dtmove
     Mat element ;
 
 public:
-    Dtmove(int i,string pas);
+    Dtmove(int i,String pas);
     int ckcamera();
     void start();
 };
 
-Dtmove::Dtmove(int i ,string pas = "./image/")
+Dtmove::Dtmove(int i ,String pas= "./images/")
 {
-    path =pas;
+   path =pas;
     cap = VideoCapture(i);
     occ = 0;
     color = Scalar( 0, 255, 0);
@@ -57,6 +56,7 @@ int Dtmove::ckcamera()
 void Dtmove::start()
 {
 
+    ckcamera();
     //初始化背景帧
     cap >> frame;
     cvtColor(frame, avg, COLOR_BGR2GRAY);
@@ -79,12 +79,27 @@ void Dtmove::start()
             occ = 1;
             ret = boundingRect(contours[j]);
             rectangle(frame,ret,color,2);
+        }
+        //重新建立背景
+        if (occ==0)
+        {
+            mean = cv::mean(differ); //名称空间重复故使用cv::
+            cout<<"m"<<mean[0]<<endl;
+            if (mean[0] > 2)
+            {
+                cap >> avg;
+                cvtColor(avg, avg, COLOR_BGR2GRAY);
+                GaussianBlur(avg, avg, Size(7,7), 1.5, 1.5);
+            }
+        }else
+        {
             if (times > 30)
             {
                 /*重新建立背景*/
                 times = 0;
                 absdiff(gray,frameold,frameold); 
                 mean = cv::mean(frameold);   //名称空间重复故使用cv::
+                cout<<"f"<<mean<<endl;
                 if  ( mean[0] < 2 ) 
                 {
                     cap >> avg;
@@ -94,24 +109,17 @@ void Dtmove::start()
                 frameold = gray.clone();
             }
             times++;
+            occ = 0;
         }
-        mean = cv::mean(differ); //名称空间重复故使用cv::
-        if ((occ == 0)&(mean[0] > 2))
-        {
-            cap >> avg;
-            cvtColor(avg, avg, COLOR_BGR2GRAY);
-            GaussianBlur(avg, avg, Size(7,7), 1.5, 1.5);
-        }
-        occ = 0;
         imshow("frame", frame);
         imshow("avg", avg);
-        imshow("bigger", bigger);
+        imshow("thresh", thresh);
         now_time = time(NULL);
         p=localtime(&now_time);
         strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
         if((waitKey(20)&0xFF) == 115)
         {
-            svtime = format("images/%s.jpg",fmt_time);
+            svtime = path + format("%s.jpg",fmt_time);
             cout << svtime << endl;
             imwrite(svtime,frame);
         }
@@ -123,6 +131,5 @@ void Dtmove::start()
 }
 int main( int argc, char** argv ){
     Dtmove dt(1);
-    dt.ckcamera();
     dt.start();
 }
