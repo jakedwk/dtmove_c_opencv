@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <sys/wait.h> 
 #include <string.h> 
+#include <strings.h> 
 #include <errno.h> 
 #include <unistd.h>
 #include<arpa/inet.h>
@@ -45,30 +46,46 @@ class Dtmove
     char buf[MAXSIZE],sbuf[MAXSIZE],newbuf;
 
 public:
-    Dtmove(int i,String pas);
+    Dtmove();
     int ckcamera();
     void socketinit();
     int accept_m();
     void recvall();
-    void start();
+    void start(int i ,String pas);
     void client();
 };
 
-Dtmove::Dtmove(int i ,String pas= "./images/")
+Dtmove::Dtmove()
 {
-    path =pas;
-    cap = VideoCapture(i);
-    cap >> frame;
-    occ = 0;
-    color = Scalar( 0, 255, 0);
-    element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
-    vector<int> param = vector<int>(2);
-    param[0]=CV_IMWRITE_JPEG_QUALITY;
-    param[1]=95;//default(95) 0-100
 
 }
+void Dtmove::client()
+{
+    int numbytes;
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+    their_addr.sin_family = AF_INET; /* host byte order */
+    their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
+    their_addr.sin_addr.s_addr =inet_addr("127.0.0.1"); 
+    bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
+    if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
+        perror("connect");
+        exit(1);
+    }
+while(1){
+    cin>>sbuf;
+    send(sockfd,sbuf,MAXSIZE,0);
+    if ((numbytes=recv(sockfd, buf, MAXSIZE, 0)) == -1) {
+        perror("recv");
+        exit(1);
+    }
+    buf[numbytes] = '\0';    
+    cout<<buf<<endl;
+}
 
-
+}
 int Dtmove::ckcamera()
 {
     if(!cap.isOpened())  // check if we succeeded
@@ -87,7 +104,6 @@ int Dtmove::ckcamera()
 
 void Dtmove::socketinit()
 {
-    imencode(".jpg",frame,buff,param);
     //创建套接字
     if ((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1) {
         perror("socket create failed!");
@@ -126,55 +142,29 @@ int Dtmove::accept_m()
 }    
 void Dtmove::recvall()
 {
+    String buf;
+    String addd("123456");
+    while(1){
     int new_server_socket = accept_m();
     cout<<"connected!"<<endl;
-    while(1){
-    recv(new_server_socket,&buf,MAXSIZE,0);
-    send(new_server_socket,&buf,MAXSIZE,0);
-    //buf+=addd;
+    send(new_server_socket,"hello",sizeof("hello"),0);
+    buf+=addd;
     cout<<buf<<endl;
-    //imencode(".jpg",frame,buff,param);
-    //cout<<buf.size()<<endl;
-
-    //while(1);
-    //if(newbuf=='q') break;
-        //if (!newbuf) return;
-        //buf += newbuf;
-        //count -= len(newbuf);
-    //return buf;
+    close(new_server_socket);
     }
 }
-
-void Dtmove::client()
-{
-    int numbytes;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
-        exit(1);
-    }
-    their_addr.sin_family = AF_INET; /* host byte order */
-    their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
-    their_addr.sin_addr.s_addr =inet_addr("127.0.0.1"); 
-    bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
-    if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
-        perror("connect");
-        exit(1);
-    }
-while(1){
-    cin>>sbuf;
-    send(sockfd,sbuf,MAXSIZE,0);
-    if ((numbytes=recv(sockfd, buf, MAXSIZE, 0)) == -1) {
-        perror("recv");
-        exit(1);
-    }
-    buf[numbytes] = '\0';    
-    cout<<buf<<endl;
-}
-
-}
-void Dtmove::start()
+void Dtmove::start(int i ,String pas= "./images/")
 {
 
+    path =pas;
+    cap = VideoCapture(i);
+    cap >> frame;
+    occ = 0;
+    color = Scalar( 0, 255, 0);
+    element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
+    vector<int> param = vector<int>(2);
+    param[0]=CV_IMWRITE_JPEG_QUALITY;
+    param[1]=95;//default(95) 0-100
     ckcamera();
     //初始化背景帧
     cap >> frame;
@@ -252,8 +242,10 @@ void Dtmove::start()
 
 }
 int main( int argc, char** argv ){
-    Dtmove dt(0);
+    Dtmove dt;
+    dt.client();
     //dt.start();
-    dt.socketinit();
-    dt.recvall();
+    //dt.socketinit();
+    //dt.recvall();
 }
+
