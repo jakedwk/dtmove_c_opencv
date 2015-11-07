@@ -19,9 +19,9 @@
 
 using namespace cv;
 using namespace std;
-#define SERVPORT 8001 
+#define SERVPORT 5788 
 #define BACKLOG 10
-#define MAXSIZE 1024 
+#define MAXSIZE 921600 
 class Dtmove
 {
     Rect ret;
@@ -37,20 +37,22 @@ class Dtmove
     Scalar color,mean;
     Mat gray,avg,differ,frame,frameold,bigger,thresh;
     Mat element ;
-    int sockfd,client_fd;
+    int sockfd,client_fd,new_server_socket;
     struct sockaddr_in my_addr;
     struct sockaddr_in remote_addr;
     struct sockaddr_in their_addr; 
     vector<uchar> buff;//buffer for coding
     vector<int> param;
-    char buf[MAXSIZE],sbuf[MAXSIZE],newbuf;
+    unsigned char buf[MAXSIZE],sbuf[MAXSIZE],newbuf;
+    unsigned int datasize,rows;
 
 public:
     Dtmove();
+    ~Dtmove();
     int ckcamera();
     void socketinit();
     int accept_m();
-    void recvall();
+    void server();
     void start(int i ,String pas);
     void client();
 };
@@ -59,33 +61,10 @@ Dtmove::Dtmove()
 {
 
 }
-void Dtmove::client()
+Dtmove::~Dtmove()
 {
-    int numbytes;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
-        exit(1);
-    }
-    their_addr.sin_family = AF_INET; /* host byte order */
-    their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
-    their_addr.sin_addr.s_addr =inet_addr("127.0.0.1"); 
-    bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
-    if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
-        perror("connect");
-        exit(1);
-    }
-while(1){
-    cin>>sbuf;
-    send(sockfd,sbuf,MAXSIZE,0);
-    if ((numbytes=recv(sockfd, buf, MAXSIZE, 0)) == -1) {
-        perror("recv");
-        exit(1);
-    }
-    buf[numbytes] = '\0';    
-    cout<<buf<<endl;
 }
 
-}
 int Dtmove::ckcamera()
 {
     if(!cap.isOpened())  // check if we succeeded
@@ -127,6 +106,8 @@ void Dtmove::socketinit()
         perror("listen error");  
         exit(1);  
     }  
+    new_server_socket = accept_m();
+    
 }
 int Dtmove::accept_m()
 {
@@ -140,25 +121,72 @@ int Dtmove::accept_m()
     }
     return new_server_socket;
 }    
-void Dtmove::recvall()
+
+void Dtmove::server()
 {
-    String buf;
-    String addd("123456");
-    while(1){
-    int new_server_socket = accept_m();
-    cout<<"connected!"<<endl;
-    send(new_server_socket,"hello",sizeof("hello"),0);
-    buf+=addd;
-    cout<<buf<<endl;
-    close(new_server_socket);
+    int pic,lst;
+    uchar *dataptr = frame.data;
+    lst = datasize%1920;
+    pic = datasize/1920;
+    send(new_server_socket,&datasize,4,0);
+    for(int i=0;i<pic;i++)
+    {
+        send(new_server_socket,dataptr,1920,0); //frame.data 为char*
+        dataptr+=1920;
     }
+    if(lst)
+        send(new_server_socket,dataptr,lst,0); //frame.data 为char*
+}
+
+void Dtmove::client()
+{
+    Mat img(Size(640,480),CV_8UC3) ;
+    uint num=0;
+    uchar *dataptr = NULL;
+    int numbytes;
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+    their_addr.sin_family = AF_INET; /* host byte order */
+    their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
+    their_addr.sin_addr.s_addr =inet_addr("127.0.0.1"); 
+    bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
+    if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
+        perror("connect");
+        exit(1);
+    }
+    while(1){
+        dataptr = buf;
+        num=0;
+        if ((numbytes=recv(sockfd,&datasize, 4, 0)) == -1) {
+            perror("recv");
+            exit(1);
+        }
+        while(1)
+        {
+            if ((numbytes=recv(sockfd,dataptr, datasize-num, 0)) == -1) {
+                perror("recv");
+                exit(1);
+            }
+            dataptr+=numbytes;
+            num+=numbytes;
+            if(num==datasize) break;
+        }
+        img.data = buf;
+        imshow("img",img);
+        key = waitKey(30);
+        if (key == 'q') break;
+    }
+    close(sockfd);
 }
 void Dtmove::start(int i ,String pas= "./images/")
 {
-
+    socketinit();
     path =pas;
     cap = VideoCapture(i);
     cap >> frame;
+    datasize = frame.rows*frame.cols*frame.channels();
     occ = 0;
     color = Scalar( 0, 255, 0);
     element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
@@ -218,6 +246,7 @@ void Dtmove::start(int i ,String pas= "./images/")
             occ = 0;
         }
         //显示图片
+        server();
         imshow("frame", frame);
         //imshow("avg", avg);
         //imshow("thresh", thresh);
@@ -239,13 +268,11 @@ void Dtmove::start(int i ,String pas= "./images/")
 
     destroyWindow("frame");
     cap.release();
+    close(new_server_socket);
 
 }
 int main( int argc, char** argv ){
     Dtmove dt;
-    dt.client();
-    //dt.start();
-    //dt.socketinit();
-    //dt.recvall();
+    dt.start(1);
+    //dt.client();
 }
-
