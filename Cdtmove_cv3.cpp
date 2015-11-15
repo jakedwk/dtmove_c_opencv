@@ -2,26 +2,28 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/opencv.hpp"
 #include "opencv2/imgproc.hpp"
+#include "opencv2/opencv.hpp"
 #include <iostream>
 #include <fstream>
-#include <time.h> 
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
-#include <sys/wait.h> 
-#include <string.h> 
-#include <strings.h> 
-#include <errno.h> 
+#include <sys/wait.h>
+#include <string.h>
+#include <strings.h>
+#include <errno.h>
 #include <unistd.h>
-#include<arpa/inet.h>
+#include <arpa/inet.h>
 
+#define SERVPORT 5788
+#define BACKLOG 10
+#define MAXSIZE 921600
+#define ADDRESS "127.0.0.1"
 using namespace cv;
 using namespace std;
-#define SERVPORT 5788 
-#define BACKLOG 10
-#define MAXSIZE 921600 
 class Dtmove
 {
     Rect ret;
@@ -31,7 +33,7 @@ class Dtmove
     bool occ;
     int times;
     char key;
-    String svtime,path;
+    String svtime,path;  //保存路径与文件名
     VideoCapture cap;
     vector<vector<Point> > contours;
     Scalar color,mean;
@@ -40,11 +42,11 @@ class Dtmove
     int sockfd,client_fd,new_server_socket;
     struct sockaddr_in my_addr;
     struct sockaddr_in remote_addr;
-    struct sockaddr_in their_addr; 
+    struct sockaddr_in their_addr;
     vector<uchar> buff;//buffer for coding
     vector<int> param;
     unsigned char buf[MAXSIZE],sbuf[MAXSIZE],newbuf;
-    unsigned int datasize,rows;
+    unsigned int datasize;
 
 public:
     Dtmove();
@@ -59,6 +61,7 @@ public:
 
 Dtmove::Dtmove()
 {
+    param = vector<int>(2);
 
 }
 Dtmove::~Dtmove()
@@ -88,7 +91,7 @@ void Dtmove::socketinit()
         perror("socket create failed!");
         exit(1);
     }
- 
+
     //绑定端口地址
     my_addr.sin_family      = AF_INET;
     my_addr.sin_port        = htons(SERVPORT);
@@ -100,7 +103,7 @@ void Dtmove::socketinit()
         exit(1);
     }
 
-        //监听端口  
+    //监听端口  
     if (listen(sockfd, BACKLOG) == -1) 
     {
         perror("listen error");  
@@ -124,25 +127,37 @@ int Dtmove::accept_m()
 
 void Dtmove::server()
 {
+    vector<uchar> buff;//buffer for coding
+    vector<int>::size_type vsize;
     int pic,lst;
-    uchar *dataptr = frame.data;
-    lst = datasize%1920;
-    pic = datasize/1920;
-    send(new_server_socket,&datasize,4,0);
-    for(int i=0;i<pic;i++)
+    param[0]=CV_IMWRITE_JPEG_QUALITY;
+    param[1]=95;
+    imencode(".jpg",frame,buff,param);
+    vsize = buff.size();
+    //vector<uchar> *dataptr = &buff;
+    lst = vsize%1920;
+    pic = vsize/1920;
+    cout<<vsize<<endl;
+    cout<<pic<<endl;
+    cout<<lst<<endl;
+    send(new_server_socket,&vsize,8,0);
+    for(uint i=0;i<vsize;i++)
     {
-        send(new_server_socket,dataptr,1920,0); //frame.data 为char*
-        dataptr+=1920;
+        send(new_server_socket,&buff[i],1,0); //frame.data 为char*
     }
-    if(lst)
-        send(new_server_socket,dataptr,lst,0); //frame.data 为char*
+    //if(lst)
+        //send(new_server_socket,dataptr,lst,0); //frame.data 为char*
 }
 
 void Dtmove::client()
 {
+    vector<uchar> buff;//buffer for coding
+    vector<int>::size_type vsize;
+    param[0]=CV_IMWRITE_JPEG_QUALITY;
+    param[1]=95;
     Mat img(Size(640,480),CV_8UC3) ;
-    uint num=0;
-    uchar *dataptr = NULL;
+    //uint num=0;
+    //vector<uchar> *dataptr = NULL;
     int numbytes;
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
@@ -150,30 +165,33 @@ void Dtmove::client()
     }
     their_addr.sin_family = AF_INET; /* host byte order */
     their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
-    their_addr.sin_addr.s_addr =inet_addr("127.0.0.1"); 
+    their_addr.sin_addr.s_addr =inet_addr(ADDRESS); 
     bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
     if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
         perror("connect");
         exit(1);
     }
     while(1){
-        dataptr = buf;
-        num=0;
-        if ((numbytes=recv(sockfd,&datasize, 4, 0)) == -1) {
+        //dataptr = &buff;
+        //num=0;
+        if ((numbytes=recv(sockfd,&vsize, 8, 0)) == -1) {
             perror("recv");
             exit(1);
         }
-        while(1)
+        cout<<"a"<<vsize<<endl;
+        buff.resize(vsize);
+        for(uint i=0;i<vsize;i++)
         {
-            if ((numbytes=recv(sockfd,dataptr, datasize-num, 0)) == -1) {
+            if ((numbytes=recv(sockfd,&buff[i], 1, 0)) == -1) {
                 perror("recv");
                 exit(1);
             }
-            dataptr+=numbytes;
-            num+=numbytes;
-            if(num==datasize) break;
+            //dataptr+=numbytes;
+            //num+=numbytes;
+            //cout<<num<<endl;
+            //if(num==vsize) break;
         }
-        img.data = buf;
+        img = imdecode(Mat(buff),CV_LOAD_IMAGE_COLOR);
         imshow("img",img);
         key = waitKey(30);
         if (key == 'q') break;
@@ -190,9 +208,6 @@ void Dtmove::start(int i ,String pas= "./images/")
     occ = 0;
     color = Scalar( 0, 255, 0);
     element = getStructuringElement( 0,Size( 3, 3 ), Point(1, 1 ) );
-    vector<int> param = vector<int>(2);
-    param[0]=CV_IMWRITE_JPEG_QUALITY;
-    param[1]=95;//default(95) 0-100
     ckcamera();
     //初始化背景帧
     cap >> frame;
@@ -247,7 +262,7 @@ void Dtmove::start(int i ,String pas= "./images/")
         }
         //显示图片
         server();
-        imshow("frame", frame);
+        //imshow("frame", frame);
         //imshow("avg", avg);
         //imshow("thresh", thresh);
         //imshow("differ", differ);
@@ -255,13 +270,12 @@ void Dtmove::start(int i ,String pas= "./images/")
         key = waitKey(25)&0xFF;
         if (key == 's')
         {
-        now_time = time(NULL);
-        p=localtime(&now_time);
-        strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
-        
-        svtime = path + format("%s.jpg",fmt_time);
-        cout << svtime << endl;
-        imwrite(svtime,frame);
+            now_time = time(NULL);
+            p=localtime(&now_time);
+            strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
+            svtime = path + format("%s.jpg",fmt_time);
+            cout << svtime << endl;
+            imwrite(svtime,frame);
         }
         if(key == 'q') break;
     }
@@ -273,6 +287,6 @@ void Dtmove::start(int i ,String pas= "./images/")
 }
 int main( int argc, char** argv ){
     Dtmove dt;
-    dt.start(1);
+    dt.start(-1);
     //dt.client();
 }
