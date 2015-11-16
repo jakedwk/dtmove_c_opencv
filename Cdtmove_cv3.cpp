@@ -1,7 +1,7 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/opencv.hpp"
-#include "opencv2/imgproc.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/opencv.hpp"
 #include <iostream>
 #include <fstream>
@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <sys/wait.h>
 #include <string.h>
@@ -48,6 +49,9 @@ class Dtmove
     vector<int> param;
     unsigned char buf[MAXSIZE],sbuf[MAXSIZE],newbuf;
     unsigned int datasize;
+    int freeman;
+    struct timeval tpstart,tpend; 
+    float timeuse; 
 
 public:
     Dtmove();
@@ -64,6 +68,7 @@ public:
 Dtmove::Dtmove()
 {
     param = vector<int>(2);
+    freeman = 0;
 }
 Dtmove::~Dtmove()
 {
@@ -113,20 +118,19 @@ void Dtmove::socketinit()
     my_addr.sin_port        = htons(SERVPORT);
     my_addr.sin_addr.s_addr = INADDR_ANY;
     bzero(&(my_addr.sin_zero),8);
-    if (bind(sockfd, (struct sockaddr*)&my_addr, sizeof(struct sockaddr)) == -1) 
+    if (bind(sockfd, (struct sockaddr*)&my_addr, sizeof(struct sockaddr)) == -1)
     {
         perror("bind error!");
         exit(1);
     }
 
     //监听端口  
-    if (listen(sockfd, BACKLOG) == -1) 
+    if (listen(sockfd, BACKLOG) == -1)
     {
-        perror("listen error");  
-        exit(1);  
-    }  
+        perror("listen error");
+        exit(1);
+    }
     new_server_socket = accept_m();
-    
 }
 int Dtmove::accept_m()
 {
@@ -146,7 +150,7 @@ void Dtmove::server()
     uint pic,lst;
     param[0]=CV_IMWRITE_JPEG_QUALITY;
     param[1]=95;
-    imwrite("./temp/a.jpg",frame,param);
+    imwrite("./temp/a.jpg",frame);
 
     FILE* f = fopen( "./temp/a.jpg", "rb" );
     CV_Assert(f != 0);
@@ -232,12 +236,13 @@ void Dtmove::start(int i ,String pas= "./images/")
     
     for(;;)     //主循环
     {
+    gettimeofday(&tpstart,NULL);
         cap >> frame;                                        // 获取一帧图像
         cvtColor(frame, gray, COLOR_BGR2GRAY);               //转化为灰度图像
         GaussianBlur(gray, gray, Size(7,7), 1.5, 1.5);       //高斯模糊
         absdiff(gray,avg,differ);                            //比较两幅图片结果放入differ中
         threshold(differ,thresh, 40, 255, THRESH_BINARY);    //根据给出的阈值二值化
-        dilate(thresh,bigger, element,Point(-1,-1), 5);      //膨胀图像
+        dilate(thresh,bigger, element,Point(-1,-1), 1);      //膨胀图像
         findContours(bigger,contours, RETR_EXTERNAL,CHAIN_APPROX_SIMPLE);  //寻找轮廓
         for(unsigned int j = 0; j < contours.size(); j++ )
         {
@@ -291,7 +296,12 @@ void Dtmove::start(int i ,String pas= "./images/")
             //cout << svtime << endl;
             //imwrite(svtime,frame);
         //}
-        if(key == 'q') break;
+        //if(key == 'q') break;
+    gettimeofday(&tpend,NULL); 
+        timeuse=1000000*(tpend.tv_sec-tpstart.tv_sec)+ 
+        tpend.tv_usec-tpstart.tv_usec; 
+        timeuse/=1000000; 
+        cout<<timeuse<<endl;
     }
 
     //destroyWindow("frame");
@@ -301,6 +311,6 @@ void Dtmove::start(int i ,String pas= "./images/")
 }
 int main( int argc, char** argv ){
     Dtmove dt;
-    //dt.start(-1);
-    dt.client();
+    dt.start(-1);
+    //dt.client();
 }
