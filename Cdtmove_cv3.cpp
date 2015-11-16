@@ -21,6 +21,7 @@
 #define SERVPORT 5788
 #define BACKLOG 10
 #define MAXSIZE 921600
+//#define ADDRESS "192.168.0.109"
 #define ADDRESS "127.0.0.1"
 using namespace cv;
 using namespace std;
@@ -57,12 +58,12 @@ public:
     void server();
     void start(int i ,String pas);
     void client();
+    void clientinit();
 };
 
 Dtmove::Dtmove()
 {
     param = vector<int>(2);
-
 }
 Dtmove::~Dtmove()
 {
@@ -83,6 +84,21 @@ int Dtmove::ckcamera()
     return 1;
 }
 
+void Dtmove::clientinit()
+{
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+    their_addr.sin_family = AF_INET; /* host byte order */
+    their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
+    their_addr.sin_addr.s_addr =inet_addr(ADDRESS); 
+    bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
+    if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
+        perror("connect");
+        exit(1);
+    }
+}
 
 void Dtmove::socketinit()
 {
@@ -127,73 +143,71 @@ int Dtmove::accept_m()
 
 void Dtmove::server()
 {
-    vector<uchar> buff;//buffer for coding
-    vector<int>::size_type vsize;
-    int pic,lst;
+    uint pic,lst;
     param[0]=CV_IMWRITE_JPEG_QUALITY;
     param[1]=95;
-    imencode(".jpg",frame,buff,param);
-    vsize = buff.size();
-    //vector<uchar> *dataptr = &buff;
-    lst = vsize%1920;
-    pic = vsize/1920;
-    cout<<vsize<<endl;
-    cout<<pic<<endl;
-    cout<<lst<<endl;
-    send(new_server_socket,&vsize,8,0);
-    for(uint i=0;i<vsize;i++)
+    imwrite("./temp/a.jpg",frame,param);
+
+    FILE* f = fopen( "./temp/a.jpg", "rb" );
+    CV_Assert(f != 0);
+    fseek( f, 0, SEEK_END );
+    uint src_len = ftell(f);
+    char *src_buf = new char[src_len];
+    fseek( f, 0, SEEK_SET);
+    fread(src_buf, src_len, 1, f); 
+
+    lst = src_len%1920;
+    pic = src_len/1920;
+    send(new_server_socket,&src_len,4,0);
+    for(uint i=0;i<pic;i++)
     {
-        send(new_server_socket,&buff[i],1,0); //frame.data 为char*
+        send(new_server_socket,src_buf,1920,0);
+        src_buf+=1920;
     }
-    //if(lst)
-        //send(new_server_socket,dataptr,lst,0); //frame.data 为char*
+    if(lst)
+        send(new_server_socket,src_buf,lst,0); 
+    fclose(f);
 }
 
 void Dtmove::client()
 {
-    vector<uchar> buff;//buffer for coding
-    vector<int>::size_type vsize;
-    param[0]=CV_IMWRITE_JPEG_QUALITY;
-    param[1]=95;
     Mat img(Size(640,480),CV_8UC3) ;
-    //uint num=0;
-    //vector<uchar> *dataptr = NULL;
+    uint num=0;
+    uchar *dataptr = NULL;
     int numbytes;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
-        exit(1);
-    }
-    their_addr.sin_family = AF_INET; /* host byte order */
-    their_addr.sin_port = htons(SERVPORT); /* short, network byte order */
-    their_addr.sin_addr.s_addr =inet_addr(ADDRESS); 
-    bzero(&(their_addr.sin_zero),8); /* zero the rest of the struct */
-    if(connect(sockfd,(struct sockaddr *)&their_addr,sizeof(struct sockaddr)) == -1) {
-        perror("connect");
-        exit(1);
-    }
+    clientinit();
+
     while(1){
-        //dataptr = &buff;
-        //num=0;
-        if ((numbytes=recv(sockfd,&vsize, 8, 0)) == -1) {
+        num=0;
+        uint src_len = 0;
+        if ((numbytes=recv(sockfd,&src_len, 4, 0)) == -1) {
             perror("recv");
             exit(1);
         }
-        cout<<"a"<<vsize<<endl;
-        buff.resize(vsize);
-        for(uint i=0;i<vsize;i++)
+        uchar *src_buf = new uchar[src_len];
+        dataptr = src_buf;
+        while(1)
         {
-            if ((numbytes=recv(sockfd,&buff[i], 1, 0)) == -1) {
+            if ((numbytes=recv(sockfd,dataptr, src_len-num, 0)) == -1) {
                 perror("recv");
                 exit(1);
             }
-            //dataptr+=numbytes;
-            //num+=numbytes;
-            //cout<<num<<endl;
-            //if(num==vsize) break;
+            dataptr+=numbytes;
+            num+=numbytes;
+            if(num==src_len) break;
         }
-        img = imdecode(Mat(buff),CV_LOAD_IMAGE_COLOR);
+        
+        FILE *dest_fp;  
+        if ((dest_fp = fopen("./temp/b.jpg", "wb")) == NULL)  
+        {     
+            printf("fopen %s failed./n", "b.jpg");  
+            perror("fopen");
+        }  
+        fwrite(src_buf, src_len, 1, dest_fp);  
+        fclose(dest_fp); 
+        img = imread("./temp/b.jpg");
         imshow("img",img);
-        key = waitKey(30);
+        key = waitKey(1);
         if (key == 'q') break;
     }
     close(sockfd);
@@ -267,26 +281,26 @@ void Dtmove::start(int i ,String pas= "./images/")
         //imshow("thresh", thresh);
         //imshow("differ", differ);
 
-        key = waitKey(25)&0xFF;
-        if (key == 's')
-        {
-            now_time = time(NULL);
-            p=localtime(&now_time);
-            strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
-            svtime = path + format("%s.jpg",fmt_time);
-            cout << svtime << endl;
-            imwrite(svtime,frame);
-        }
+        //key = waitKey(25)&0xFF;
+        //if (key == 's')
+        //{
+            //now_time = time(NULL);
+            //p=localtime(&now_time);
+            //strftime(fmt_time, sizeof(fmt_time), "%Y_%m_%d_%H_%M_%S", p);
+            //svtime = path + format("%s.jpg",fmt_time);
+            //cout << svtime << endl;
+            //imwrite(svtime,frame);
+        //}
         if(key == 'q') break;
     }
 
-    destroyWindow("frame");
+    //destroyWindow("frame");
     cap.release();
     close(new_server_socket);
 
 }
 int main( int argc, char** argv ){
     Dtmove dt;
-    dt.start(-1);
-    //dt.client();
+    //dt.start(-1);
+    dt.client();
 }
