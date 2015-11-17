@@ -147,69 +147,58 @@ int Dtmove::accept_m()
 
 void Dtmove::server()
 {
+    vector<uchar> vbuf;
+    String filename = tempfile();
     uint pic,lst;
     param[0]=CV_IMWRITE_JPEG_QUALITY;
     param[1]=95;
-    imwrite("./temp/a.jpg",frame);
+    gettimeofday(&tpstart,NULL);
+    imencode(".jpg",frame,vbuf,param);
+    gettimeofday(&tpend,NULL); 
+    uint vsize = vbuf.size();
+    uchar *dataptr = &vbuf[0];
 
-    FILE* f = fopen( "./temp/a.jpg", "rb" );
-    CV_Assert(f != 0);
-    fseek( f, 0, SEEK_END );
-    uint src_len = ftell(f);
-    char *src_buf = new char[src_len];
-    fseek( f, 0, SEEK_SET);
-    fread(src_buf, src_len, 1, f); 
-
-    lst = src_len%1920;
-    pic = src_len/1920;
-    send(new_server_socket,&src_len,4,0);
+    lst = vsize%1920;
+    pic = vsize/1920;
+    send(new_server_socket,&vsize,4,0);
     for(uint i=0;i<pic;i++)
     {
-        send(new_server_socket,src_buf,1920,0);
-        src_buf+=1920;
+        send(new_server_socket,dataptr,1920,0);
+        dataptr+=1920;
     }
     if(lst)
-        send(new_server_socket,src_buf,lst,0); 
-    fclose(f);
+        send(new_server_socket,dataptr,lst,0); 
 }
 
 void Dtmove::client()
 {
     Mat img(Size(640,480),CV_8UC3) ;
-    uint num=0;
+    uint num=0,vsize=0;
     uchar *dataptr = NULL;
     int numbytes;
     clientinit();
 
     while(1){
         num=0;
-        uint src_len = 0;
-        if ((numbytes=recv(sockfd,&src_len, 4, 0)) == -1) {
+        if ((numbytes=recv(sockfd,&vsize, 4, 0)) == -1) {
             perror("recv");
             exit(1);
         }
-        uchar *src_buf = new uchar[src_len];
-        dataptr = src_buf;
+        vector<uchar> vbuf;
+        vbuf.resize(vsize);
+        dataptr = &vbuf[0];
         while(1)
         {
-            if ((numbytes=recv(sockfd,dataptr, src_len-num, 0)) == -1) {
+            if ((numbytes=recv(sockfd,dataptr, vsize-num, 0)) == -1) {
                 perror("recv");
                 exit(1);
             }
             dataptr+=numbytes;
             num+=numbytes;
-            if(num==src_len) break;
+            if(num==vsize) break;
         }
         
-        FILE *dest_fp;  
-        if ((dest_fp = fopen("./temp/b.jpg", "wb")) == NULL)  
-        {     
-            printf("fopen %s failed./n", "b.jpg");  
-            perror("fopen");
-        }  
-        fwrite(src_buf, src_len, 1, dest_fp);  
-        fclose(dest_fp); 
-        img = imread("./temp/b.jpg");
+        img = imdecode(Mat(vbuf),CV_LOAD_IMAGE_COLOR);
         imshow("img",img);
         key = waitKey(1);
         if (key == 'q') break;
@@ -236,7 +225,6 @@ void Dtmove::start(int i ,String pas= "./images/")
     
     for(;;)     //主循环
     {
-    gettimeofday(&tpstart,NULL);
         cap >> frame;                                        // 获取一帧图像
         cvtColor(frame, gray, COLOR_BGR2GRAY);               //转化为灰度图像
         GaussianBlur(gray, gray, Size(7,7), 1.5, 1.5);       //高斯模糊
@@ -297,7 +285,6 @@ void Dtmove::start(int i ,String pas= "./images/")
             //imwrite(svtime,frame);
         //}
         //if(key == 'q') break;
-    gettimeofday(&tpend,NULL); 
         timeuse=1000000*(tpend.tv_sec-tpstart.tv_sec)+ 
         tpend.tv_usec-tpstart.tv_usec; 
         timeuse/=1000000; 
