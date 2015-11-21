@@ -59,7 +59,7 @@ public:
     int ckcamera();
     void socketinit();
     int accept_m();
-    void server();
+    void sender();
     void start(int i ,String pas);
     void client();
     void clientinit();
@@ -145,7 +145,7 @@ int Dtmove::accept_m()
     return new_server_socket;
 }    
 
-void Dtmove::server()
+void Dtmove::sender()
 {
     vector<uchar> vbuf;
     String filename = tempfile();
@@ -268,7 +268,7 @@ void Dtmove::start(int i ,String pas= "./images/")
             occ = 0;
         }
         //显示图片
-        server();
+        sender();
         //imshow("frame", frame);
         //imshow("avg", avg);
         //imshow("thresh", thresh);
