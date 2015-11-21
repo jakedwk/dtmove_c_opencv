@@ -60,6 +60,7 @@ public:
     void socketinit();
     int accept_m();
     void sender();
+    void server();
     void start(int i ,String pas);
     void client();
     void clientinit();
@@ -87,6 +88,49 @@ int Dtmove::ckcamera()
         waitKey(10);
     }
     return 1;
+}
+void Dtmove::server()
+{
+    socketinit();
+    new_server_socket = accept_m();
+    uint num=0,vsize=0;
+    uint pic,lst;
+    uchar *dataptr = NULL;
+    int numbytes;
+    clientinit();
+
+    while(1){
+        //接收
+        num=0;
+        if ((numbytes=recv(sockfd,&vsize, 4, 0)) == -1) {
+            perror("recv");
+            exit(1);
+        }
+        vector<uchar> vbuf;
+        vbuf.resize(vsize);
+        dataptr = &vbuf[0];
+        while(1)
+        {
+            if ((numbytes=recv(sockfd,dataptr, vsize-num, 0)) == -1) {
+                perror("recv");
+                exit(1);
+            }
+            dataptr+=numbytes;
+            num+=numbytes;
+            if(num==vsize) break;
+        }
+        //发送
+        lst = vsize%1920;
+        pic = vsize/1920;
+        send(new_server_socket,&vsize,4,0);
+        for(uint i=0;i<pic;i++)
+        {
+            send(new_server_socket,dataptr,1920,0);
+            dataptr+=1920;
+        }
+        if(lst)
+            send(new_server_socket,dataptr,lst,0); 
+    }
 }
 
 void Dtmove::clientinit()
