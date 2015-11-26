@@ -22,8 +22,8 @@
 #define SERVPORT 5788
 #define BACKLOG 10
 #define MAXSIZE 921600
-//#define ADDRESS "192.168.0.109"
-#define ADDRESS "127.0.0.1"
+#define ADDRESS "192.168.0.116"
+//#define ADDRESS "127.0.0.1"
 using namespace cv;
 using namespace std;
 class Dtmove
@@ -52,6 +52,8 @@ class Dtmove
     int freeman;
     struct timeval tpstart,tpend; 
     float timeuse; 
+    uint vsize;
+    vector<uchar> vbuf;
 
 public:
     Dtmove();
@@ -59,6 +61,8 @@ public:
     int ckcamera();
     void socketinit();
     int accept_m();
+    void senddata();
+    void recvdata();
     void sender();
     void server();
     void start(int i ,String pas);
@@ -70,6 +74,7 @@ Dtmove::Dtmove()
 {
     param = vector<int>(2);
     freeman = 0;
+    vsize = 0;
 }
 Dtmove::~Dtmove()
 {
@@ -89,50 +94,6 @@ int Dtmove::ckcamera()
     }
     return 1;
 }
-void Dtmove::server()
-{
-    socketinit();
-    new_server_socket = accept_m();
-    uint num=0,vsize=0;
-    uint pic,lst;
-    uchar *dataptr = NULL;
-    int numbytes;
-    clientinit();
-
-    while(1){
-        //接收
-        num=0;
-        if ((numbytes=recv(sockfd,&vsize, 4, 0)) == -1) {
-            perror("recv");
-            exit(1);
-        }
-        vector<uchar> vbuf;
-        vbuf.resize(vsize);
-        dataptr = &vbuf[0];
-        while(1)
-        {
-            if ((numbytes=recv(sockfd,dataptr, vsize-num, 0)) == -1) {
-                perror("recv");
-                exit(1);
-            }
-            dataptr+=numbytes;
-            num+=numbytes;
-            if(num==vsize) break;
-        }
-        //发送
-        lst = vsize%1920;
-        pic = vsize/1920;
-        send(new_server_socket,&vsize,4,0);
-        for(uint i=0;i<pic;i++)
-        {
-            send(new_server_socket,dataptr,1920,0);
-            dataptr+=1920;
-        }
-        if(lst)
-            send(new_server_socket,dataptr,lst,0); 
-    }
-}
-
 void Dtmove::clientinit()
 {
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -189,19 +150,11 @@ int Dtmove::accept_m()
     return new_server_socket;
 }    
 
-void Dtmove::sender()
+void Dtmove::senddata()
 {
-    vector<uchar> vbuf;
-    String filename = tempfile();
     uint pic,lst;
-    param[0]=CV_IMWRITE_JPEG_QUALITY;
-    param[1]=95;
-    gettimeofday(&tpstart,NULL);
-    imencode(".jpg",frame,vbuf,param);
-    gettimeofday(&tpend,NULL); 
-    uint vsize = vbuf.size();
-    uchar *dataptr = &vbuf[0];
-
+    uchar *dataptr = NULL;
+        //发送
     lst = vsize%1920;
     pic = vsize/1920;
     send(new_server_socket,&vsize,4,0);
@@ -213,35 +166,55 @@ void Dtmove::sender()
     if(lst)
         send(new_server_socket,dataptr,lst,0); 
 }
+void Dtmove::recvdata()
+{
+    uint num=0;
+    int numbytes;
+    uchar *dataptr = NULL;
+    if ((numbytes=recv(sockfd,&vsize, 4, 0)) == -1) {
+        perror("recv");
+        exit(1);
+    }
+    vbuf.resize(vsize);
+    dataptr = &vbuf[0];
+    while(1)
+    {
+        if ((numbytes=recv(sockfd,dataptr, vsize-num, 0)) == -1) {
+            perror("recv");
+            exit(1);
+        }
+        dataptr+=numbytes;
+        num+=numbytes;
+        if(num==vsize) break;
+    }
+}
+void Dtmove::server()
+{
+    socketinit();
+    new_server_socket = accept_m();
+
+}
+
+
+void Dtmove::sender()
+{
+    String filename = tempfile();
+    param[0]=CV_IMWRITE_JPEG_QUALITY;
+    param[1]=95;
+    //gettimeofday(&tpstart,NULL);
+    imencode(".jpg",frame,vbuf,param);
+    //gettimeofday(&tpend,NULL); 
+    vsize = vbuf.size();
+    senddata();
+}
 
 void Dtmove::client()
 {
     Mat img(Size(640,480),CV_8UC3) ;
-    uint num=0,vsize=0;
-    uchar *dataptr = NULL;
-    int numbytes;
     clientinit();
-
-    while(1){
-        num=0;
-        if ((numbytes=recv(sockfd,&vsize, 4, 0)) == -1) {
-            perror("recv");
-            exit(1);
-        }
-        vector<uchar> vbuf;
-        vbuf.resize(vsize);
-        dataptr = &vbuf[0];
-        while(1)
-        {
-            if ((numbytes=recv(sockfd,dataptr, vsize-num, 0)) == -1) {
-                perror("recv");
-                exit(1);
-            }
-            dataptr+=numbytes;
-            num+=numbytes;
-            if(num==vsize) break;
-        }
-        
+    while(1)
+    {
+        recvdata();
         img = imdecode(Mat(vbuf),CV_LOAD_IMAGE_COLOR);
         imshow("img",img);
         key = waitKey(1);
@@ -329,10 +302,10 @@ void Dtmove::start(int i ,String pas= "./images/")
             //imwrite(svtime,frame);
         //}
         //if(key == 'q') break;
-        timeuse=1000000*(tpend.tv_sec-tpstart.tv_sec)+ 
-        tpend.tv_usec-tpstart.tv_usec; 
-        timeuse/=1000000; 
-        cout<<timeuse<<endl;
+        //timeuse=1000000*(tpend.tv_sec-tpstart.tv_sec)+ 
+        //tpend.tv_usec-tpstart.tv_usec; 
+        //timeuse/=1000000; 
+        //cout<<timeuse<<endl;
     }
 
     //destroyWindow("frame");
@@ -342,6 +315,6 @@ void Dtmove::start(int i ,String pas= "./images/")
 }
 int main( int argc, char** argv ){
     Dtmove dt;
-    dt.start(-1);
-    //dt.client();
+    //dt.start(-1);
+    dt.client();
 }
