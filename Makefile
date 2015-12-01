@@ -1,10 +1,11 @@
 OBJS = Cdtmove_cv3.o
-CFLAGS = -Wall -g `pkg-config --cflags --libs opencv`
-CXXFLAGS = -Wall -g `pkg-config --cflags --libs opencv`
+CFLAGS = -Wall -g -std=c++11 `pkg-config --cflags --libs opencv`
+CXXFLAGS = -Wall -g -std=c++11 `pkg-config --cflags --libs opencv`
+LDFLAGS = -pthread
 CC = gcc
 CXX = g++
 r_dtmove_cv3.out : $(OBJS)
-	$(CXX) $(OBJS) $(CFLAGS) -o $@
+	$(CXX) $(OBJS) $(CXXFLAGS) -o $@
 hello.o : Cdtmove_cv3.cpp
 clean :
 	rm *.out *.o

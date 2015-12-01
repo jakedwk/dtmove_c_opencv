@@ -18,6 +18,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <thread>
+#include <pthread.h>
 
 #define SERVPORT 5788
 #define BACKLOG 10
@@ -65,6 +67,8 @@ public:
     void recvdata();
     void sender();
     void server();
+    void server_send();
+    void server_receive();
     void start(int i ,String pas);
     void client();
     void clientinit();
@@ -188,10 +192,21 @@ void Dtmove::recvdata()
         if(num==vsize) break;
     }
 }
+void Dtmove::server_send()
+{
+
+}
+void Dtmove::server_receive()
+{
+    cout<<std::this_thread::get_id()<<endl;
+    cout<<vsize<<endl;
+    
+}
 void Dtmove::server()
 {
-    socketinit();
-    new_server_socket = accept_m();
+
+    std::thread t(&Dtmove::server_receive,this);
+    t.join();
 
 }
 
@@ -316,5 +331,6 @@ void Dtmove::start(int i ,String pas= "./images/")
 int main( int argc, char** argv ){
     Dtmove dt;
     //dt.start(-1);
-    dt.client();
+    //dt.client();
+    dt.server();
 }
