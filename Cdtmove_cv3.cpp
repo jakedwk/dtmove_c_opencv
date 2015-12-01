@@ -65,10 +65,11 @@ public:
     int accept_m();
     void senddata();
     void recvdata();
+    void recvall(int socket,void *ptr,uint len);
     void sender();
     void server();
-    void server_send();
-    void server_receive();
+    void server_send(int new_socket);
+    void server_receive(int new_socket);
     void start(int i ,String pas);
     void client();
     void clientinit();
@@ -139,7 +140,6 @@ void Dtmove::socketinit()
         perror("listen error");
         exit(1);
     }
-    new_server_socket = accept_m();
 }
 int Dtmove::accept_m()
 {
@@ -192,28 +192,59 @@ void Dtmove::recvdata()
         if(num==vsize) break;
     }
 }
-void Dtmove::server_send()
+void Dtmove::recvall(int socket,void *ptr,uint len)
+{
+    int numbytes;
+    uchar *dataptr = (uchar *)ptr;
+    while(len)
+    {
+        if ((numbytes=recv(socket,dataptr, len, 0)) == -1) {
+            perror("recv");
+            exit(1);
+        }
+        cout<<"recving!"<<endl;
+        dataptr+=numbytes;
+        len-=numbytes;
+    }
+}
+void Dtmove::server_send(int new_socket)
 {
 
 }
-void Dtmove::server_receive()
+void Dtmove::server_receive(int new_socket)
 {
     cout<<std::this_thread::get_id()<<endl;
-    cout<<vsize<<endl;
+    cout<<new_socket<<endl;
     
 }
 void Dtmove::server()
 {
+    uint linker=0;
+    vector<std::thread> threads;
+    socketinit();
+    while(1)
+    {
+        cout<<"run!"<<endl;
+        new_server_socket = accept_m();
+        cout<<"accepted!"<<endl;
+        recvall(new_server_socket,&linker,4);
+        cout<<"recived!"<<endl;
+        cout<<linker<<endl;
+        if(linker == 0x05)
+            threads.push_back(std::thread(&Dtmove::server_receive,this,new_server_socket));
+        if(linker == 0x50)
+            threads.push_back(std::thread(&Dtmove::server_send,this,new_server_socket));
+        if(linker == 0x55) break;
 
-    std::thread t(&Dtmove::server_receive,this);
-    t.join();
+    }
+    std::for_each(threads.begin(),threads.end(),std::mem_fn(&std::thread::join));
 
 }
 
 
 void Dtmove::sender()
 {
-    String filename = tempfile();
+    new_server_socket = accept_m();
     param[0]=CV_IMWRITE_JPEG_QUALITY;
     param[1]=95;
     //gettimeofday(&tpstart,NULL);
