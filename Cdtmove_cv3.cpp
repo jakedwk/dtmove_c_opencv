@@ -202,6 +202,7 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
             perror("recv");
             exit(1);
         }
+        if(numbytes == 0) break;
         cout<<"recving!"<<endl;
         dataptr+=numbytes;
         len-=numbytes;
@@ -237,6 +238,7 @@ void Dtmove::server()
         if(linker == 0x55) break;
 
     }
+    
     std::for_each(threads.begin(),threads.end(),std::mem_fn(&std::thread::join));
 
 }
