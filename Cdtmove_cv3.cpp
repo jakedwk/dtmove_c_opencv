@@ -222,23 +222,24 @@ void Dtmove::server()
 {
     uint linker=0;
     vector<std::thread> threads;
+    vector<int> sockets;
     socketinit();
     while(1)
     {
         cout<<"run!"<<endl;
-        new_server_socket = accept_m();
+        sockets.push_back(accept_m());
         cout<<"accepted!"<<endl;
         recvall(new_server_socket,&linker,4);
         cout<<"recived!"<<endl;
         cout<<linker<<endl;
         if(linker == 0x05)
-            threads.push_back(std::thread(&Dtmove::server_receive,this,new_server_socket));
+            threads.push_back(std::thread(&Dtmove::server_receive,this,sockets.back()));
         if(linker == 0x50)
-            threads.push_back(std::thread(&Dtmove::server_send,this,new_server_socket));
+            threads.push_back(std::thread(&Dtmove::server_send,this,sockets.back()));
         if(linker == 0x55) break;
 
     }
-    
+    std::for_each(sockets.begin(),sockets.end(),close);
     std::for_each(threads.begin(),threads.end(),std::mem_fn(&std::thread::join));
 
 }
