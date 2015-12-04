@@ -161,14 +161,14 @@ void Dtmove::senddata()
         //发送
     lst = vsize%1920;
     pic = vsize/1920;
-    send(new_server_socket,&vsize,4,0);
+    send(sockfd,&vsize,4,0);
     for(uint i=0;i<pic;i++)
     {
-        send(new_server_socket,dataptr,1920,0);
+        send(sockfd,dataptr,1920,0);
         dataptr+=1920;
     }
     if(lst)
-        send(new_server_socket,dataptr,lst,0); 
+        send(sockfd,dataptr,lst,0); 
 }
 void Dtmove::recvdata()
 {
@@ -210,13 +210,11 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
 }
 void Dtmove::server_send(int new_socket)
 {
-
+    senddata();
 }
 void Dtmove::server_receive(int new_socket)
 {
-    cout<<std::this_thread::get_id()<<endl;
-    cout<<new_socket<<endl;
-    
+    recvdata();
 }
 void Dtmove::server()
 {
@@ -229,7 +227,7 @@ void Dtmove::server()
         cout<<"run!"<<endl;
         sockets.push_back(accept_m());
         cout<<"accepted!"<<endl;
-        recvall(new_server_socket,&linker,4);
+        recvall(sockets.back(),&linker,4);
         cout<<"recived!"<<endl;
         cout<<linker<<endl;
         if(linker == 0x05)
@@ -247,7 +245,6 @@ void Dtmove::server()
 
 void Dtmove::sender()
 {
-    new_server_socket = accept_m();
     param[0]=CV_IMWRITE_JPEG_QUALITY;
     param[1]=95;
     //gettimeofday(&tpstart,NULL);
@@ -273,7 +270,7 @@ void Dtmove::client()
 }
 void Dtmove::start(int i ,String pas= "./images/")
 {
-    socketinit();
+    clientinit();
     path =pas;
     cap = VideoCapture(i);
     cap >> frame;
@@ -289,7 +286,7 @@ void Dtmove::start(int i ,String pas= "./images/")
     gray = avg.clone();
     frameold = gray.clone();
     
-    for(;;)     //主循环
+    while(1)    //主循环
     {
         cap >> frame;                                        // 获取一帧图像
         cvtColor(frame, gray, COLOR_BGR2GRAY);               //转化为灰度图像
@@ -359,7 +356,7 @@ void Dtmove::start(int i ,String pas= "./images/")
 
     //destroyWindow("frame");
     cap.release();
-    close(new_server_socket);
+    close(sockfd);
 
 }
 int main( int argc, char** argv ){
