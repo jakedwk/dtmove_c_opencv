@@ -19,7 +19,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <thread>
-#include <pthread.h>
+#include <mutex> 
 
 #define SERVPORT 5788
 #define BACKLOG 10
@@ -56,6 +56,7 @@ class Dtmove
     float timeuse; 
     uint vsize;
     vector<uchar> vbuf;
+    mutex mtx;
 
 public:
     Dtmove();
@@ -210,11 +211,15 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
 }
 void Dtmove::server_send(int new_socket)
 {
+    mtx.lock();
     senddata();
+    mtx.unlock();
 }
 void Dtmove::server_receive(int new_socket)
 {
+    mtx.lock();
     recvdata();
+    mtx.unlock();
 }
 void Dtmove::server()
 {
@@ -256,8 +261,10 @@ void Dtmove::sender()
 
 void Dtmove::client()
 {
+    int sorr=0x50;
     Mat img(Size(640,480),CV_8UC3) ;
     clientinit();
+    send(sockfd,&sorr,4,0);
     while(1)
     {
         recvdata();
@@ -270,7 +277,9 @@ void Dtmove::client()
 }
 void Dtmove::start(int i ,String pas= "./images/")
 {
+    int sorr=0x05;
     clientinit();
+    send(sockfd,&sorr,4,0);
     path =pas;
     cap = VideoCapture(i);
     cap >> frame;
