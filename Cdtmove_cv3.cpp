@@ -24,7 +24,7 @@
 #define SERVPORT 5788
 #define BACKLOG 10
 #define MAXSIZE 921600
-#define ADDRESS "192.168.0.116"
+#define ADDRESS "192.168.0.107"
 //#define ADDRESS "127.0.0.1"
 using namespace cv;
 using namespace std;
@@ -64,8 +64,8 @@ public:
     int ckcamera();
     void socketinit();
     int accept_m();
-    void senddata();
-    void recvdata();
+    void senddata(int new_socket);
+    void recvdata(int new_socket);
     void recvall(int socket,void *ptr,uint len);
     void sender();
     void server();
@@ -155,28 +155,28 @@ int Dtmove::accept_m()
     return new_server_socket;
 }    
 
-void Dtmove::senddata()
+void Dtmove::senddata(int new_socket)
 {
     uint pic,lst;
-    uchar *dataptr = NULL;
-        //发送
+    uchar *dataptr = &vbuf[0];
+    //发送
     lst = vsize%1920;
     pic = vsize/1920;
-    send(sockfd,&vsize,4,0);
+    send(new_socket,&vsize,4,0);
     for(uint i=0;i<pic;i++)
     {
-        send(sockfd,dataptr,1920,0);
+        send(new_socket,dataptr,1920,0);
         dataptr+=1920;
     }
     if(lst)
-        send(sockfd,dataptr,lst,0); 
+        send(new_socket,dataptr,lst,0); 
 }
-void Dtmove::recvdata()
+void Dtmove::recvdata(int new_socket)
 {
     uint num=0;
     int numbytes;
     uchar *dataptr = NULL;
-    if ((numbytes=recv(sockfd,&vsize, 4, 0)) == -1) {
+    if ((numbytes=recv(new_socket,&vsize, 4, 0)) == -1) {
         perror("recv");
         exit(1);
     }
@@ -184,7 +184,7 @@ void Dtmove::recvdata()
     dataptr = &vbuf[0];
     while(1)
     {
-        if ((numbytes=recv(sockfd,dataptr, vsize-num, 0)) == -1) {
+        if ((numbytes=recv(new_socket,dataptr, vsize-num, 0)) == -1) {
             perror("recv");
             exit(1);
         }
@@ -211,15 +211,27 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
 }
 void Dtmove::server_send(int new_socket)
 {
-    mtx.lock();
-    senddata();
-    mtx.unlock();
+    cout<<"server_send run!"<<endl;
+    while(1)
+    {
+        mtx.lock();
+        senddata(new_socket);
+        mtx.unlock();
+    }
 }
 void Dtmove::server_receive(int new_socket)
 {
-    mtx.lock();
-    recvdata();
-    mtx.unlock();
+    Mat img(Size(640,480),CV_8UC3) ;
+    while(1)
+    {
+        mtx.lock();
+        recvdata(new_socket);
+        img = imdecode(Mat(vbuf),CV_LOAD_IMAGE_COLOR);
+        imshow("img",img);
+        key = waitKey(1);
+        if (key == 'q') break;
+        mtx.unlock();
+    }
 }
 void Dtmove::server()
 {
@@ -256,7 +268,7 @@ void Dtmove::sender()
     imencode(".jpg",frame,vbuf,param);
     //gettimeofday(&tpend,NULL); 
     vsize = vbuf.size();
-    senddata();
+    senddata(sockfd);
 }
 
 void Dtmove::client()
@@ -264,10 +276,12 @@ void Dtmove::client()
     int sorr=0x50;
     Mat img(Size(640,480),CV_8UC3) ;
     clientinit();
+    cout<<"client run"<<endl;
     send(sockfd,&sorr,4,0);
+    cout<<"send ok"<<endl;
     while(1)
     {
-        recvdata();
+        recvdata(sockfd);
         img = imdecode(Mat(vbuf),CV_LOAD_IMAGE_COLOR);
         imshow("img",img);
         key = waitKey(1);
