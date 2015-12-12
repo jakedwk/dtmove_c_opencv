@@ -56,7 +56,7 @@ class Dtmove
     float timeuse; 
     uint vsize;
     vector<uchar> vbuf;
-    mutex mtx;
+    vector<int> recv_sockets,send_sockets;
 
 public:
     Dtmove();
@@ -68,9 +68,8 @@ public:
     void recvdata(int new_socket);
     void recvall(int socket,void *ptr,uint len);
     void sender();
-    void server();
-    void server_send(int new_socket);
-    void server_receive(int new_socket);
+    void server_listen();
+    void server_transfer();
     void start(int i ,String pas);
     void client();
     void clientinit();
@@ -209,53 +208,36 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
         len-=numbytes;
     }
 }
-void Dtmove::server_send(int new_socket)
+void Dtmove::server_transfer()
 {
-    cout<<"server_send run!"<<endl;
     while(1)
     {
-        mtx.lock();
-        senddata(new_socket);
-        mtx.unlock();
+        for (int x: recv_sockets)
+        {
+            recvdata(x);
+        }
+        for (int x: send_sockets)
+        {
+            senddata(x);
+        }
     }
 }
-void Dtmove::server_receive(int new_socket)
+void Dtmove::server_listen()
 {
-    Mat img(Size(640,480),CV_8UC3) ;
-    while(1)
-    {
-        mtx.lock();
-        recvdata(new_socket);
-        img = imdecode(Mat(vbuf),CV_LOAD_IMAGE_COLOR);
-        imshow("img",img);
-        key = waitKey(1);
-        if (key == 'q') break;
-        mtx.unlock();
-    }
-}
-void Dtmove::server()
-{
-    uint linker=0;
-    vector<std::thread> threads;
-    vector<int> sockets;
+    int socket_t,linker;
     socketinit();
+    thread t(&Dtmove::server_transfer,this);
     while(1)
     {
-        cout<<"run!"<<endl;
-        sockets.push_back(accept_m());
-        cout<<"accepted!"<<endl;
-        recvall(sockets.back(),&linker,4);
-        cout<<"recived!"<<endl;
-        cout<<linker<<endl;
-        if(linker == 0x05)
-            threads.push_back(std::thread(&Dtmove::server_receive,this,sockets.back()));
-        if(linker == 0x50)
-            threads.push_back(std::thread(&Dtmove::server_send,this,sockets.back()));
+        socket_t = accept_m();
+        recvall(socket_t,&linker,4);
+        if(linker == 0x50) recv_sockets.push_back(socket_t);
+        if(linker == 0x05) send_sockets.push_back(socket_t);
         if(linker == 0x55) break;
-
     }
-    std::for_each(sockets.begin(),sockets.end(),close);
-    std::for_each(threads.begin(),threads.end(),std::mem_fn(&std::thread::join));
+    std::for_each(recv_sockets.begin(),recv_sockets.end(),close);
+    std::for_each(send_sockets.begin(),send_sockets.end(),close);
+    t.join();
 
 }
 
@@ -386,5 +368,5 @@ int main( int argc, char** argv ){
     Dtmove dt;
     //dt.start(-1);
     //dt.client();
-    dt.server();
+    dt.server_listen();
 }
