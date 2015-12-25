@@ -24,8 +24,8 @@
 #define SERVPORT 5788
 #define BACKLOG 10
 #define MAXSIZE 921600
-#define ADDRESS "192.168.0.107"
-//#define ADDRESS "127.0.0.1"
+//#define ADDRESS "182.254.240.149"
+#define ADDRESS "127.0.0.1"
 using namespace cv;
 using namespace std;
 class Dtmove
@@ -203,7 +203,6 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
             exit(1);
         }
         if(numbytes == 0) break;
-        cout<<"recving!"<<endl;
         dataptr+=numbytes;
         len-=numbytes;
     }
@@ -231,8 +230,8 @@ void Dtmove::server_listen()
     {
         socket_t = accept_m();
         recvall(socket_t,&linker,4);
-        if(linker == 0x50) recv_sockets.push_back(socket_t);
-        if(linker == 0x05) send_sockets.push_back(socket_t);
+        if(linker == 0x05) recv_sockets.push_back(socket_t);
+        if(linker == 0x50) send_sockets.push_back(socket_t);
         if(linker == 0x55) break;
     }
     std::for_each(recv_sockets.begin(),recv_sockets.end(),close);

@@ -5,7 +5,7 @@ LDFLAGS = -pthread
 CC = gcc
 CXX = g++
 r_dtmove_cv3.out : $(OBJS)
-	$(CXX) $(OBJS) $(CXXFLAGS) -o $@
+	$(CXX) $(OBJS) $(CXXFLAGS) $(LDFLAGS) -o $@
 hello.o : Cdtmove_cv3.cpp
 clean :
 	rm *.out *.o
