@@ -209,10 +209,12 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
 }
 void Dtmove::server_transfer()
 {
+    const int ack=0x77;
     while(1)
     {
         for (int x: recv_sockets)
         {
+            send(x,&ack,4,0);
             recvdata(x);
         }
         for (int x: send_sockets)
@@ -221,6 +223,7 @@ void Dtmove::server_transfer()
         }
     }
 }
+
 void Dtmove::server_listen()
 {
     int socket_t,linker;
@@ -272,7 +275,7 @@ void Dtmove::client()
 }
 void Dtmove::start(int i ,String pas= "./images/")
 {
-    int sorr=0x05;
+    int sorr=0x05,ack;
     clientinit();
     send(sockfd,&sorr,4,0);
     path =pas;
@@ -292,6 +295,8 @@ void Dtmove::start(int i ,String pas= "./images/")
     
     while(1)    //主循环
     {
+        recvall(sockfd,&ack,4);
+        if(ack != 0x77) perror("ack");
         cap >> frame;                                        // 获取一帧图像
         cvtColor(frame, gray, COLOR_BGR2GRAY);               //转化为灰度图像
         GaussianBlur(gray, gray, Size(7,7), 1.5, 1.5);       //高斯模糊
