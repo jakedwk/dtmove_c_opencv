@@ -66,7 +66,7 @@ public:
     int accept_m();
     void senddata(int new_socket);
     void recvdata(int new_socket);
-    void recvall(int socket,void *ptr,uint len);
+    int recvall(int socket,void *ptr,uint len);
     void sender();
     void server_listen();
     void server_transfer();
@@ -192,7 +192,7 @@ void Dtmove::recvdata(int new_socket)
         if(num==vsize) break;
     }
 }
-void Dtmove::recvall(int socket,void *ptr,uint len)
+int Dtmove::recvall(int socket,void *ptr,uint len)
 {
     int numbytes;
     uchar *dataptr = (uchar *)ptr;
@@ -202,24 +202,31 @@ void Dtmove::recvall(int socket,void *ptr,uint len)
             perror("recv");
             exit(1);
         }
-        if(numbytes == 0) break;
+        if(numbytes == 0) {
+            return 0;
+        }
         dataptr+=numbytes;
         len-=numbytes;
     }
+    return 1;
 }
 void Dtmove::server_transfer()
 {
-    const int ack=0x77;
-    while(1)
-    {
-        for (int x: recv_sockets)
-        {
+    int ack=0x77,exack;
+    while(1) {
+        for (auto x: recv_sockets) {
             send(x,&ack,4,0);
             recvdata(x);
         }
-        for (int x: send_sockets)
-        {
-            senddata(x);
+        for (vector<int>::iterator it = send_sockets.begin();it!=send_sockets.end();) {
+            cout<<*it<<endl;
+            if(recvall(*it,&exack,4)){
+                senddata(*it);
+                it++;
+            }
+            else{ 
+                send_sockets.erase(it);
+            }
         }
     }
 }
@@ -265,6 +272,7 @@ void Dtmove::client()
     cout<<"send ok"<<endl;
     while(1)
     {
+        send(sockfd,&sorr,4,0);
         recvdata(sockfd);
         img = imdecode(Mat(vbuf),CV_LOAD_IMAGE_COLOR);
         imshow("img",img);
